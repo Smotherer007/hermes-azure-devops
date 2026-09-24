@@ -1,0 +1,15 @@
+[project]
+name = "hermes-azure-devops"
+version = "1.0.0"
+description = "Azure DevOps plugin for Hermes Agent: work items, boards, sprints, repositories, pull requests, pipelines and test plans."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Patrick Weppelmann" }]
+requires-python = ">=3.11"
+# Standard library only. pi-azure-devops is built on the npm package
+# azure-devops-node-api; this port talks to the REST API with urllib instead, so
+# nothing has to be pulled into Hermes' virtualenv.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pyyaml>=6,<7"]

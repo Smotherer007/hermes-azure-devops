@@ -1,0 +1,79 @@
+name: azure-devops
+version: 1.0.0
+description: "Azure DevOps for Hermes: work items, boards, sprints and capacity, repositories and pull requests, pipelines and builds, and test plans."
+author: Patrick Weppelmann
+kind: standalone
+manifest_version: 2
+api_version: 1
+license: MIT
+homepage: https://github.com/Smotherer007/hermes-azure-devops
+tags: [azure-devops, ado, devops, work-items, pull-requests, pipelines]
+provides_tools:
+  - azure_devops_doctor
+  - azure_devops_get_work_item
+  - azure_devops_query_work_items
+  - azure_devops_list_work_item_types
+  - azure_devops_get_work_item_comments
+  - azure_devops_get_work_item_revisions
+  - azure_devops_create_work_item
+  - azure_devops_update_work_item
+  - azure_devops_add_work_item_comment
+  - azure_devops_manage_work_item_links
+  - azure_devops_list_teams
+  - azure_devops_list_boards
+  - azure_devops_get_board
+  - azure_devops_list_iterations
+  - azure_devops_get_iteration_work_items
+  - azure_devops_get_capacity
+  - azure_devops_set_board_columns
+  - azure_devops_set_iteration
+  - azure_devops_set_capacity
+  - azure_devops_list_repos
+  - azure_devops_get_repo
+  - azure_devops_list_branches
+  - azure_devops_list_pull_requests
+  - azure_devops_get_pull_request
+  - azure_devops_get_pull_request_threads
+  - azure_devops_get_pull_request_commits
+  - azure_devops_list_policies
+  - azure_devops_get_policy_evaluations
+  - azure_devops_create_pull_request
+  - azure_devops_update_pull_request
+  - azure_devops_add_pull_request_comment
+  - azure_devops_set_pull_request_vote
+  - azure_devops_set_pull_request_autocomplete
+  - azure_devops_link_pr_work_items
+  - azure_devops_list_pipelines
+  - azure_devops_get_pipeline
+  - azure_devops_list_runs
+  - azure_devops_get_run
+  - azure_devops_get_run_artifacts
+  - azure_devops_get_run_logs
+  - azure_devops_get_run_timeline
+  - azure_devops_run_pipeline
+  - azure_devops_cancel_run
+  - azure_devops_retry_run
+  - azure_devops_list_test_plans
+  - azure_devops_get_test_plan
+  - azure_devops_list_test_suites
+  - azure_devops_get_test_suite
+  - azure_devops_list_test_cases
+  - azure_devops_list_test_points
+  - azure_devops_get_test_run
+  - azure_devops_list_test_runs
+  - azure_devops_create_test_run
+  - azure_devops_update_test_results
+provides_hooks:
+  - pre_tool_call
+# No requires_env: orgs and PATs live in the config file, and the Azure CLI can
+# be used instead of a PAT. These variables are alternatives for containers.
+optional_env:
+  - name: AZURE_DEVOPS_CONFIG
+    description: "Path to the config file (default: $HERMES_HOME/azure-devops-config.json)"
+config_schema:
+  safety_level:
+    type: str
+    choices: [open, confirm, readonly]
+    default: open
+    label: "Safety level"
+    description: "open: mutation tools run directly. confirm: every mutation goes through the Hermes approval gate. readonly: mutation tools are blocked. A per-org and per-project safetyLevel in the config file overrides this."

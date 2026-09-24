@@ -1,0 +1,79 @@
+# Candidate entry for the Hermes plugin catalog.
+# Target: NousResearch/hermes-agent -> plugin-catalog/azure-devops.yaml
+#
+# The `sha` is an exact 40-character commit pin, as the catalog requires, and
+# points at the commit that froze the plugin code (the initial release).
+# To ship a new version, move the pin with a new PR -- never a branch or tag.
+name: azure-devops
+repo: https://github.com/Smotherer007/hermes-azure-devops
+sha: "0bc64230061a164bd76e4c27306fbdcb022f8635"
+description: Azure DevOps work items, boards, sprints and capacity, repositories and pull
+  requests, pipelines and builds, and test plans. Reads and writes as whoever owns the
+  configured personal access token (or as the Azure CLI login), with an open/confirm/readonly
+  safety level per org and per project. Standard library only, no npm SDK.
+maintainer: Patrick Weppelmann
+tier: community
+category: tools
+version: "1.0.0"
+docs_url: https://github.com/Smotherer007/hermes-azure-devops#readme
+platforms: []
+capabilities:
+  provides_tools:
+  - azure_devops_doctor
+  - azure_devops_get_work_item
+  - azure_devops_query_work_items
+  - azure_devops_list_work_item_types
+  - azure_devops_get_work_item_comments
+  - azure_devops_get_work_item_revisions
+  - azure_devops_create_work_item
+  - azure_devops_update_work_item
+  - azure_devops_add_work_item_comment
+  - azure_devops_manage_work_item_links
+  - azure_devops_list_teams
+  - azure_devops_list_boards
+  - azure_devops_get_board
+  - azure_devops_list_iterations
+  - azure_devops_get_iteration_work_items
+  - azure_devops_get_capacity
+  - azure_devops_set_board_columns
+  - azure_devops_set_iteration
+  - azure_devops_set_capacity
+  - azure_devops_list_repos
+  - azure_devops_get_repo
+  - azure_devops_list_branches
+  - azure_devops_list_pull_requests
+  - azure_devops_get_pull_request
+  - azure_devops_get_pull_request_threads
+  - azure_devops_get_pull_request_commits
+  - azure_devops_list_policies
+  - azure_devops_get_policy_evaluations
+  - azure_devops_create_pull_request
+  - azure_devops_update_pull_request
+  - azure_devops_add_pull_request_comment
+  - azure_devops_set_pull_request_vote
+  - azure_devops_set_pull_request_autocomplete
+  - azure_devops_link_pr_work_items
+  - azure_devops_list_pipelines
+  - azure_devops_get_pipeline
+  - azure_devops_list_runs
+  - azure_devops_get_run
+  - azure_devops_get_run_artifacts
+  - azure_devops_get_run_logs
+  - azure_devops_get_run_timeline
+  - azure_devops_run_pipeline
+  - azure_devops_cancel_run
+  - azure_devops_retry_run
+  - azure_devops_list_test_plans
+  - azure_devops_get_test_plan
+  - azure_devops_list_test_suites
+  - azure_devops_get_test_suite
+  - azure_devops_list_test_cases
+  - azure_devops_list_test_points
+  - azure_devops_get_test_run
+  - azure_devops_list_test_runs
+  - azure_devops_create_test_run
+  - azure_devops_update_test_results
+  provides_hooks:
+  - pre_tool_call
+  provides_middleware: []
+  requires_env: []

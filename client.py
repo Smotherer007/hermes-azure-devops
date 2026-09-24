@@ -25,11 +25,14 @@ skill documents (`azure-devops-pr-approve-autocomplete`):
 from __future__ import annotations
 
 import json
+import os
 import socket
+import ssl
 import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 from .auth import resolve_auth
@@ -55,6 +58,70 @@ PLUGIN_VERSION = "1.0.0"
 _lock = threading.RLock()
 _header_cache: Dict[str, Dict[str, str]] = {}
 _identity_cache: Dict[str, str] = {}
+_ssl_contexts: Dict[Any, ssl.SSLContext] = {}
+
+#: Where a CA bundle usually lives, best first. macOS with a python.org build has
+#: no default verify path at all (Node ships its own CA store, which is why the
+#: pi extension never hits this), so the system bundle has to be named explicitly.
+#: The OS store comes before certifi on purpose: a corporate root CA installed in
+#: the system keychain is there, not in certifi's Mozilla-derived list.
+CA_BUNDLE_CANDIDATES = (
+    "/etc/ssl/cert.pem",  # macOS, BSD
+    "/etc/pki/tls/certs/ca-bundle.crt",  # RHEL, Fedora, CentOS
+    "/etc/ssl/certs/ca-certificates.crt",  # Debian, Ubuntu
+    "/etc/ssl/ca-bundle.pem",  # SUSE
+)
+
+
+def _ca_bundle() -> Optional[str]:
+    """A CA bundle to verify with, or None to let Python decide."""
+    # Python honours these itself, so do not override an explicit choice.
+    for variable in ("SSL_CERT_FILE", "SSL_CERT_DIR"):
+        if os.environ.get(variable, "").strip():
+            return None
+
+    for candidate in CA_BUNDLE_CANDIDATES:
+        if Path(candidate).is_file():
+            return candidate
+
+    try:
+        import certifi  # type: ignore
+
+        path = certifi.where()
+        return path if Path(path).is_file() else None
+    except Exception:
+        return None
+
+
+def _ssl_context(config: AzureDevOpsConfig) -> Optional[ssl.SSLContext]:
+    """A context per verification mode, so it is built once.
+
+    ``insecureTls`` on the org is the escape hatch for an on-premise server with
+    a self-signed certificate; it is part of the cache key so that switching
+    orgs cannot leak verification settings into one another.
+    """
+    if config.insecure_tls:
+        key: Any = "insecure"
+    else:
+        key = _ca_bundle() or "system"
+
+    with _lock:
+        cached = _ssl_contexts.get(key)
+    if cached is not None:
+        return cached
+
+    if key == "insecure":
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    elif key == "system":
+        context = ssl.create_default_context()
+    else:
+        context = ssl.create_default_context(cafile=key)
+
+    with _lock:
+        _ssl_contexts[key] = context
+    return context
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +314,9 @@ def request(
     status = 0
     raw = ""
     try:
-        with urllib.request.urlopen(request_object, timeout=timeout) as response:
+        with urllib.request.urlopen(
+            request_object, timeout=timeout, context=_ssl_context(config)
+        ) as response:
             status = response.status
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as error:
@@ -279,6 +348,14 @@ def request(
             0, f"Could not reach Azure DevOps ({url}): {reason}", url
         ) from None
     except OSError as error:
+        if isinstance(error, ssl.SSLCertVerificationError):
+            raise AzureDevOpsApiError(
+                0,
+                f"TLS certificate verification failed for {config.org_url}: {error.verify_message or error}. "
+                "For an on-premise server with a self-signed certificate, add "
+                '"insecureTls": true to that org in the config file.',
+                url,
+            ) from None
         raise AzureDevOpsApiError(0, f"Could not reach Azure DevOps ({url}): {error}", url) from None
 
     if not raw:
@@ -861,9 +938,10 @@ def list_test_points(
     *,
     test_case_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
+    # The route really is singular ("TestPoint"); "Points" answers 404.
     url = _build_url(
         f"{_org_url(config)}/{_project(config)}/_apis/testplan/Plans/{_quote(plan_id)}"
-        f"/Suites/{_quote(suite_id)}/Points",
+        f"/Suites/{_quote(suite_id)}/TestPoint",
         {"testCaseId": test_case_id, "api-version": API_VERSION},
     )
     return _unwrap(request(config, "GET", url))

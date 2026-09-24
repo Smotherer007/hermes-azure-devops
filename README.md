@@ -135,6 +135,9 @@ differences:
    with "Invalid argument value". This port sends the real identity id.
 4. **Unlinking a PR work item works.** pi reads the work item without
    `$expand=relations`, so it never finds the link to remove. This port expands.
+5. **A not-yet-run test point reads `⏸️ not executed`** instead of `❓ ?`.
+   Azure DevOps omits the `outcome` field entirely until a point is executed,
+   and `?` read like an unknown or failed result.
 
 The first two are documented as failures in the `azure-devops-pr-approve-
 autocomplete` skill for the pi extension.

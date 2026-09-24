@@ -450,6 +450,13 @@ def test_test_point_outcome_icons():
     assert "🚫" in text
 
 
+def test_test_point_without_an_outcome_reads_as_not_executed():
+    # Azure DevOps omits `outcome` until a point has been run.
+    point = {"id": 7, "testCaseReference": {"id": 501, "name": "Login"}}
+    assert "⏸️ not executed" in fmt.format_test_point(point)
+    assert "⏸️ not executed" in fmt.format_test_point_list([point])
+
+
 def test_test_run_detail_results_line():
     text = fmt.format_test_run(
         {

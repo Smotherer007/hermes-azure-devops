@@ -91,9 +91,13 @@ def list_boards(args: Dict[str, Any]) -> str:
 GET_BOARD_SCHEMA = schema(
     "azure_devops_get_board",
     "Get full detail of an Azure DevOps board — columns with state mappings, item limits, and rows. "
-    "Requires board ID.",
+    "Use azure_devops_list_boards first: the board id is the board's own id (on newer projects often "
+    "a GUID), not necessarily the backlog category name.",
     {
-        "boardId": {"type": "string", "description": "Board ID (e.g. 'Stories', 'Features', 'Epics')"},
+        "boardId": {
+            "type": "string",
+            "description": 'Board ID or name from azure_devops_list_boards (e.g. "Stories", "Issues", or a GUID)',
+        },
         "team": TEAM_PROPERTY,
         "org": ORG_PROPERTY,
         "project": PROJECT_PROPERTY,
@@ -271,9 +275,10 @@ COLUMNS_PROPERTY = {
 SET_BOARD_COLUMNS_SCHEMA = schema(
     "azure_devops_set_board_columns",
     "Reconfigure columns on an Azure DevOps board. Replaces all columns with the provided set. "
-    "Each column has a name, optional WIP limit, and state mappings per work item type.",
+    "Each column has a name, optional WIP limit, and state mappings per work item type. "
+    "Take the board id from azure_devops_list_boards and the current columns from azure_devops_get_board.",
     {
-        "boardId": {"type": "string", "description": "Board ID (e.g. 'Stories', 'Features')"},
+        "boardId": {"type": "string", "description": "Board ID or name from azure_devops_list_boards"},
         "columns": COLUMNS_PROPERTY,
         "team": TEAM_PROPERTY,
         "org": ORG_PROPERTY,

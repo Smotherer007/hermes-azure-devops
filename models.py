@@ -44,6 +44,8 @@ class OrgConfig:
     projects: tuple = ()
     #: Safety level for this org (overridden by a project, overrides the global one).
     safety_level: Optional[str] = None
+    #: Skip TLS certificate verification (self-signed certificates only).
+    insecure_tls: bool = False
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,8 @@ class AzureDevOpsConfig:
     max_query_results: int = 100
     autocomplete: bool = True
     mock: bool = False
+    #: Skip TLS verification (self-signed certificates on an on-premise server only).
+    insecure_tls: bool = False
 
     @property
     def org_label(self) -> str:

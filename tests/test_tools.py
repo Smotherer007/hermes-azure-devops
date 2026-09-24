@@ -659,7 +659,7 @@ def test_get_run_logs_formats_each_entry(configure, ado):
 
 def test_list_test_points_live(configure, ado):
     configure()
-    ado.on("GET", "/Points", {"value": [
+    ado.on("GET", "/TestPoint", {"value": [
         {
             "id": 1,
             "testCaseReference": {"id": 501, "name": "Login"},
@@ -675,7 +675,7 @@ def test_list_test_points_live(configure, ado):
 
 def test_create_test_run_collects_point_ids_from_the_suites(configure, ado):
     configure()
-    ado.on("GET", "/Points", {"value": [{"id": 11}, {"id": 12}]})
+    ado.on("GET", "/TestPoint", {"value": [{"id": 11}, {"id": 12}]})
     ado.on("POST", "/_apis/test/runs", {"id": 601, "name": "Run"})
 
     payload = call("azure_devops_create_test_run", {"planId": 101, "suiteIds": [301], "name": "Smoke"})
@@ -688,7 +688,7 @@ def test_create_test_run_collects_point_ids_from_the_suites(configure, ado):
 
 def test_create_test_run_without_points_is_an_error(configure, ado):
     configure()
-    ado.on("GET", "/Points", {"value": []})
+    ado.on("GET", "/TestPoint", {"value": []})
     payload = call("azure_devops_create_test_run", {"planId": 101, "suiteIds": [301]})
     assert "No test points found" in payload["error"]
 

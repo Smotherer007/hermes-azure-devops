@@ -97,7 +97,7 @@ def _config(ado, **overrides):
         (lambda c: client.list_test_suites(c, 101), "/TestProject/_apis/testplan/Plans/101/Suites"),
         (lambda c: client.get_test_suite(c, 101, 301), "/TestProject/_apis/testplan/Plans/101/Suites/301"),
         (lambda c: client.list_test_cases(c, 101, 301), "/TestProject/_apis/testplan/Plans/101/Suites/301/TestCase"),
-        (lambda c: client.list_test_points(c, 101, 301), "/TestProject/_apis/testplan/Plans/101/Suites/301/Points"),
+        (lambda c: client.list_test_points(c, 101, 301), "/TestProject/_apis/testplan/Plans/101/Suites/301/TestPoint"),
         (lambda c: client.list_test_runs(c), "/TestProject/_apis/test/runs"),
         (lambda c: client.get_test_run(c, 501), "/TestProject/_apis/test/runs/501"),
     ],

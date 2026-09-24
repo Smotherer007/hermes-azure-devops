@@ -257,6 +257,7 @@ def _orgs(raw: Dict[str, Any]) -> List[OrgConfig]:
                 url=str(entry.get("url") or ""),
                 projects=tuple(projects),
                 safety_level=_valid_safety(entry.get("safetyLevel")),
+                insecure_tls=bool(entry.get("insecureTls", False)),
             )
         )
     return orgs
@@ -344,6 +345,7 @@ def _build(
         max_query_results=settings["max_query_results"],
         autocomplete=settings["autocomplete"],
         mock=settings["mock"],
+        insecure_tls=org.insecure_tls,
     )
 
 
@@ -467,6 +469,7 @@ def resolve_org_project_config(
         max_query_results=settings["max_query_results"],
         autocomplete=settings["autocomplete"],
         mock=settings["mock"],
+        insecure_tls=target_org.insecure_tls,
     )
 
 

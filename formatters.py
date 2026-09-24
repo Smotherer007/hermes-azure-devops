@@ -965,11 +965,14 @@ def format_test_case_list(test_cases: Sequence) -> str:
 
 
 def format_test_point(point: Dict[str, Any]) -> str:
-    outcome_icon = TEST_OUTCOME_ICONS.get(point.get("outcome") or "", "❓")
+    # Azure DevOps omits ``outcome`` entirely until a point has been executed,
+    # so an absent value is "not executed" rather than "unknown".
+    outcome = point.get("outcome")
+    outcome_icon = TEST_OUTCOME_ICONS.get(outcome or "notExecuted", "❓")
     reference = point.get("testCaseReference") or {}
     lines = [
         f"**Point #{point.get('id') or '?'}** — {reference.get('name') or '?'} (case #{reference.get('id') or '?'})",
-        f"- **Outcome:** {outcome_icon} {point.get('outcome') or 'none'}",
+        f"- **Outcome:** {outcome_icon} {outcome or 'not executed'}",
     ]
     if _get(point, "configuration", "name"):
         lines.append(f"- **Configuration:** {_get(point, 'configuration', 'name')}")
@@ -988,13 +991,14 @@ def format_test_point_list(points: Sequence) -> str:
 
     lines: List[str] = []
     for point in points:
-        outcome_icon = TEST_OUTCOME_ICONS.get(point.get("outcome") or "", "❓")
+        outcome = point.get("outcome")
+        outcome_icon = TEST_OUTCOME_ICONS.get(outcome or "notExecuted", "❓")
         configuration = _get(point, "configuration", "name") or "?"
         tester = _get(point, "tester", "displayName") or "?"
         reference = point.get("testCaseReference") or {}
         lines.append(
             f"#{point.get('id') or '?'} {reference.get('name') or '?'} — "
-            f"{outcome_icon} {point.get('outcome') or '?'} — {configuration} — {tester}"
+            f"{outcome_icon} {outcome or 'not executed'} — {configuration} — {tester}"
         )
     return "\n".join(lines)
 

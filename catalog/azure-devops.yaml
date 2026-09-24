@@ -6,7 +6,7 @@
 # To ship a new version, move the pin with a new PR -- never a branch or tag.
 name: azure-devops
 repo: https://github.com/Smotherer007/hermes-azure-devops
-sha: "88106d492a881a8fedb5f08b8410c686db2ee182"
+sha: "2caa58663aa6f94a9c6d1b677cd50498b4af56fd"
 description: Azure DevOps work items, boards, sprints and capacity, repositories and pull
   requests, pipelines and builds, and test plans. Reads and writes as whoever owns the
   configured personal access token (or as the Azure CLI login), with an open/confirm/readonly

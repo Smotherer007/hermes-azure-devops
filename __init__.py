@@ -143,7 +143,11 @@ def register(ctx) -> None:
         except Exception:
             return "open"
 
-    ctx.register_hook("pre_tool_call", make_pre_tool_call_hook(safety_level))
+    def file_safety_level(args: dict) -> Any:
+        """What the config file says about the org/project this call targets."""
+        return cfg.effective_safety_level(args.get("org"), args.get("project"))
+
+    ctx.register_hook("pre_tool_call", make_pre_tool_call_hook(safety_level, file_safety_level))
 
     ctx.register_command(
         "azure-devops-status",

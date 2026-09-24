@@ -39,6 +39,9 @@ shape pi-azure-devops writes, so one file can serve both agents:
 }
 ```
 
+Per-org and per-project `safetyLevel` are honoured, and an org can set
+`"insecureTls": true` for an on-premise server with a self-signed certificate.
+
 A template is written on first start. Then:
 
 ```
@@ -68,18 +71,26 @@ directory. Keep it that way.
 
 ### Safety
 
-Mutation tools are gated by a safety level, either globally via the Hermes
-setting `plugins.entries.azure-devops.settings.safety_level` or per org and per
-project in the config file (project > org > global):
+Mutation tools are gated by a safety level. There are two sources, and the
+**more restrictive one wins** — the Hermes setting can only tighten, never
+loosen, so a plugin-level `readonly` locks everything down while a project-level
+`readonly` cannot be undone by the plugin default:
+
+1. `plugins.entries.azure-devops.settings.safety_level` (default `open`, i.e. no
+   extra restriction)
+2. `safetyLevel` in the config file, cascading **project > org > global**
+   (global default `confirm`)
 
 | Level | Effect |
 | --- | --- |
 | `open` | Mutations run directly |
-| `confirm` (config default) | Every mutation goes through Hermes' approval prompt, which shows a one-line summary of what would change |
+| `confirm` | Every mutation goes through Hermes' approval prompt, which shows a one-line summary of what would change |
 | `readonly` | Mutations are blocked |
 
 Pinning a production org to `readonly` while a dev org stays `open` is the usual
-setup. The 18 gated tools are work item create/update/comment/link, board
+setup. The gate is evaluated per call against the `org`/`project` the tool
+actually targets, so `{ "org": "prod" }` is blocked even when the default
+connection is unrestricted. The 18 gated tools are work item create/update/comment/link, board
 columns, iteration and capacity writes, pull request create/update/comment/vote/
 auto-complete/link, pipeline run/cancel/retry, and test run create / result
 update. Reads are never affected.

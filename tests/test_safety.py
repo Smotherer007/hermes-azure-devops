@@ -66,6 +66,79 @@ def test_hook_asks_for_approval_in_confirm_mode():
     assert "(fix → main)" in verdict["message"]
 
 
+def test_stricter_never_loosens():
+    assert safety.stricter("open", "readonly") == "readonly"
+    assert safety.stricter("readonly", "open") == "readonly"
+    assert safety.stricter("open", "confirm") == "confirm"
+    assert safety.stricter("confirm", "confirm") == "confirm"
+    assert safety.stricter("open", "open") == "open"
+
+
+def _file_level(args):
+    """Adapter: the hook hands over the whole args mapping (see __init__.py)."""
+    return sub("config").effective_safety_level(args.get("org"), args.get("project"))
+
+
+def test_a_readonly_project_in_the_config_file_is_enforced(configure, isolated_config):
+    """The hook must gate on the org/project the call targets, not just the setting."""
+    from conftest import write_config
+
+    write_config(isolated_config, {
+        "orgs": [
+            {
+                "name": "prod",
+                "url": "https://dev.azure.com/prod",
+                "safetyLevel": "readonly",
+                "projects": [{"name": "P", "pat": "x"}],
+            },
+            {
+                "name": "dev",
+                "url": "https://dev.azure.com/dev",
+                "safetyLevel": "open",
+                "projects": [{"name": "D", "pat": "y"}],
+            },
+        ],
+        "defaultOrg": "dev",
+    })
+    sub("config").load_config()
+
+    hook = safety.make_pre_tool_call_hook(lambda: "open", _file_level)
+
+    # The dev org is unrestricted...
+    assert hook("azure_devops_run_pipeline", {"pipelineId": 1}) is None
+    # ...while the same tool against the production org is blocked.
+    verdict = hook("azure_devops_run_pipeline", {"pipelineId": 1, "org": "prod"})
+    assert verdict["action"] == "block"
+
+
+def test_an_unset_level_falls_back_to_confirm_not_open(configure, isolated_config):
+    """A connection with no safetyLevel anywhere asks before writing."""
+    from conftest import write_config
+
+    write_config(isolated_config, {
+        "orgs": [{"name": "o", "url": "https://dev.azure.com/o", "projects": [{"name": "P", "pat": "x"}]}]
+    })
+    sub("config").load_config()
+
+    hook = safety.make_pre_tool_call_hook(lambda: "open", _file_level)
+    assert hook("azure_devops_cancel_run", {"runId": 1})["action"] == "approve"
+
+
+def test_the_plugin_setting_can_only_tighten(configure):
+    configure()  # config file says confirm
+    hook = safety.make_pre_tool_call_hook(lambda: "readonly", _file_level)
+    assert hook("azure_devops_create_work_item", {"title": "x"})["action"] == "block"
+
+
+def test_a_broken_config_does_not_unblock_a_mutation(isolated_config):
+    isolated_config.write_text("{ not json", encoding="utf-8")
+    config_module = sub("config")
+    config_module.load_config()
+
+    hook = safety.make_pre_tool_call_hook(lambda: "confirm", _file_level)
+    assert hook("azure_devops_create_work_item", {"title": "x"})["action"] == "approve"
+
+
 def test_hook_reads_the_level_lazily():
     """The setting is read per call, so a config change applies immediately."""
     levels = ["open"]

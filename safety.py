@@ -28,6 +28,22 @@ def normalize_level(value: Any) -> str:
     return level if level in VALID_LEVELS else "confirm"
 
 
+#: How restrictive each level is. Used to combine two sources of policy.
+_STRICTNESS = {"open": 0, "confirm": 1, "readonly": 2}
+
+
+def stricter(first: Any, second: Any) -> str:
+    """The more restrictive of two levels.
+
+    The plugin setting in ``config.yaml`` can only *tighten* what the config
+    file allows, never loosen it: forcing ``readonly`` for everyone is a
+    legitimate operator decision, while ignoring a project's ``readonly``
+    because the plugin default is ``open`` would not be.
+    """
+    left, right = normalize_level(first), normalize_level(second)
+    return left if _STRICTNESS[left] >= _STRICTNESS[right] else right
+
+
 def should_block(safety_level: str, tool_name: str) -> Optional[str]:
     """A block reason when the tool must not run, otherwise None."""
     if not is_mutation_tool(tool_name):
@@ -40,8 +56,17 @@ def should_block(safety_level: str, tool_name: str) -> Optional[str]:
     return None
 
 
-def make_pre_tool_call_hook(get_level: Callable[[], Any]) -> Callable[..., Optional[dict]]:
-    """Build the pre_tool_call hook around a settings reader."""
+def make_pre_tool_call_hook(
+    get_level: Callable[[], Any],
+    get_file_level: Optional[Callable[[dict], Optional[str]]] = None,
+) -> Callable[..., Optional[dict]]:
+    """Build the pre_tool_call hook.
+
+    ``get_level`` is the plugin setting. ``get_file_level`` receives the tool
+    arguments and returns what the config file implies for the org/project that
+    call targets (see :func:`config.effective_safety_level`), so a ``readonly``
+    production org is enforced rather than merely displayed.
+    """
 
     def pre_tool_call(
         tool_name: str = "", args: Optional[dict] = None, **_kwargs: Any
@@ -49,7 +74,16 @@ def make_pre_tool_call_hook(get_level: Callable[[], Any]) -> Callable[..., Optio
         if tool_name not in MUTATION_TOOLS:
             return None
 
+        settings_args = args if isinstance(args, dict) else {}
         level = normalize_level(get_level())
+        if get_file_level is not None:
+            try:
+                from_file = get_file_level(settings_args)
+            except Exception:
+                from_file = None
+            if from_file:
+                level = stricter(level, from_file)
+
         if level == "open":
             return None
         if level == "readonly":
@@ -61,7 +95,7 @@ def make_pre_tool_call_hook(get_level: Callable[[], Any]) -> Callable[..., Optio
             }
         return {
             "action": "approve",
-            "message": format_mutation_summary(tool_name, args or {}),
+            "message": format_mutation_summary(tool_name, settings_args),
             "rule_key": f"azure-devops:{tool_name}",
         }
 

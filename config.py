@@ -473,6 +473,25 @@ def resolve_org_project_config(
     )
 
 
+def effective_safety_level(org: Optional[str] = None, project: Optional[str] = None) -> Optional[str]:
+    """The safety level the config file implies for one connection.
+
+    Used by the ``pre_tool_call`` hook so that ``readonly`` on a production org
+    is actually enforced, not merely displayed. Returns None when nothing is
+    resolvable, so the caller can fall back to its own setting.
+    """
+    try:
+        base = resolve_config()
+    except Exception:
+        return None
+    try:
+        return resolve_org_project_config(base, org, project).safety_level
+    except Exception:
+        # An unknown org/project fails in the tool itself; keep the level of the
+        # default connection rather than silently loosening the gate.
+        return base.safety_level
+
+
 def resolve_all_org_configs() -> Tuple[List[AzureDevOpsConfig], List[str]]:
     """Every configured org x project pair, so the doctor can validate them all."""
     raw = _raw_config()

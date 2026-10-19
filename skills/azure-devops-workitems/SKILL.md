@@ -633,3 +633,11 @@ A **root suite** is auto-created with each plan and serves as the top-level cont
 | "Test plan not found" | Use `azure_devops_list_test_plans` to find the correct plan ID. |
 | "Test suite not found" | Verify suite ID belongs to the specified plan. Use `azure_devops_list_test_suites`. |
 | "Invalid test outcome" | Use values from the Test Outcome Reference table below. |
+| "required field(s) missing or invalid: … (TF401320)" | The project marks those fields mandatory. Nothing is wrong with the PAT. Supply them, usually `System.Description` plus `Microsoft.VSTS.Common.AcceptanceCriteria`, via the `description` argument and the `fields` map. |
+
+### Mandatory fields are per project, not per work item type
+
+A project's inherited process can mark fields as **required** (`System.Description`, `Microsoft.VSTS.Common.AcceptanceCriteria`, custom fields). Creating a work item without them fails with HTTP **400** and `TF401320`. Do not diagnose this as an authentication problem: a 401 is a 401, and `TF401320` merely contains those digits. The tool now reports the offending fields by name; if it does not, read `customProperties.RuleValidationErrors` from the response body.
+
+Check the rule before a bulk import rather than after: create one work item of the target type, inspect the error, then batch.
+

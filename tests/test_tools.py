@@ -219,6 +219,31 @@ def test_create_work_item_builds_a_patch_document(configure, ado):
     assert {"op": "add", "path": "/fields/System.Priority", "value": "1"} in patch
 
 
+def test_create_work_item_reports_missing_mandatory_fields(configure, ado):
+    configure()
+    ado.fail(
+        "POST",
+        "/_apis/wit/workitems/$",
+        400,
+        {
+            "message": "TF401320: Rule Error for field Description.",
+            "typeKey": "RuleValidationException",
+            "customProperties": {
+                "RuleValidationErrors": [
+                    {
+                        "fieldReferenceName": "System.Description",
+                        "errorMessage": "TF401320: Rule Error for field Description.",
+                    }
+                ]
+            },
+        },
+    )
+
+    payload = call("azure_devops_create_work_item", {"type": "User Story", "title": "No description"})
+    assert "System.Description" in payload["error"]
+    assert "Authentication" not in payload["error"]
+
+
 def test_update_work_item_uses_replace_operations(configure, ado):
     configure()
     ado.on("PATCH", "/_apis/wit/workitems/101", _wi())

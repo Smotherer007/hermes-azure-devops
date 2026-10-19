@@ -339,6 +339,55 @@ def test_unknown_error_keeps_only_the_first_line():
     assert client.format_ado_error(RuntimeError("first line\nstack trace here")) == "first line"
 
 
+#: What SCODA-shaped projects answer when a mandatory field is empty: 400, not
+#: 401, with the offending fields listed in ``customProperties``.
+_RULE_VIOLATION = {
+    "message": "TF401320: Rule Error for field Description. Error code: Required, InvalidEmpty.",
+    "typeKey": "RuleValidationException",
+    "customProperties": {
+        "RuleValidationErrors": [
+            {
+                "fieldReferenceName": "System.Description",
+                "fieldStatusFlags": "required, invalidEmpty",
+                "errorMessage": "TF401320: Rule Error for field Description. Error code: Required, InvalidEmpty.",
+            },
+            {
+                "fieldReferenceName": "Microsoft.VSTS.Common.AcceptanceCriteria",
+                "fieldStatusFlags": "required, invalidEmpty",
+                "errorMessage": "TF401320: Rule Error for field Acceptance Criteria. Error code: Required, InvalidEmpty.",
+            },
+        ]
+    },
+}
+
+
+def test_rule_violation_names_the_fields_instead_of_blaming_the_pat():
+    error = models.AzureDevOpsApiError(
+        400, "TF401320: Rule Error for field Description.", body=_RULE_VIOLATION
+    )
+    message = client.format_ado_error(error)
+    assert "Authentication" not in message
+    assert "Description (System.Description)" in message
+    assert "Acceptance Criteria (Microsoft.VSTS.Common.AcceptanceCriteria)" in message
+    assert not client.is_auth_error(error)
+
+
+def test_rule_violation_without_a_body_still_keeps_its_own_text():
+    message = client.format_ado_error(models.AzureDevOpsApiError(400, "TF401320: Rule Error for field X."))
+    assert message.startswith("TF401320")
+
+
+def test_the_digits_of_an_error_code_are_not_a_status():
+    # "401" inside TF401320 used to be read as a 401 and reported as a bad PAT.
+    assert not client.is_auth_error(models.AzureDevOpsApiError(0, "TF401320: Rule Error"))
+
+
+def test_missing_field_errors_are_raised_with_the_field_list():
+    error = client._describe_failure(400, _RULE_VIOLATION, "http://example/_apis/wit/workitems")
+    assert "System.Description" in str(error)
+    assert error.status == 400
+
+
 def test_unreachable_host_is_reported_not_raised_raw():
     config = models.AzureDevOpsConfig(
         org_url="http://127.0.0.1:1", project="P", pat="x", auth_method="pat"

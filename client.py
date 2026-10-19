@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import ssl
 import threading
@@ -183,29 +184,92 @@ def _as_dict(payload: Any) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+#: Azure DevOps error codes that are meaningful on their own. Matched as
+#: substrings only because the codes are distinctive: no status number is, and
+#: ``"401" in "TF401320"`` is exactly the false positive this guards against.
+_CODE_HINTS = (
+    ("TF401232", "Project not found. Verify the project name in your configuration."),
+    ("TF401233", "Work item not found. Check the work item ID."),
+    ("VS402335", "Invalid work item type. Use azure_devops_list_work_item_types to see valid types."),
+    ("TF401181", "The pull request cannot be edited in its current state (it may already be merging or completed)."),
+)
+
+#: Translated by HTTP status, taken from the exception rather than the text.
+_STATUS_HINTS = {
+    401: "Authentication failed. Check your PAT or Azure CLI login.",
+    403: "Permission denied. Your credentials lack access to this resource.",
+    404: "Resource not found. Check the organization URL and project name.",
+    429: "Rate limited by Azure DevOps. Wait a moment and try again.",
+}
+
+#: Transport failures only ever appear as text.
+_NETWORK_HINTS = (
+    ("ETIMEDOUT", "Network error: could not reach Azure DevOps. Check your connection."),
+    ("ECONNREFUSED", "Network error: could not reach Azure DevOps. Check your connection."),
+    ("ENOTFOUND", "DNS error: could not resolve the Azure DevOps hostname. Check the org URL."),
+)
+
+#: A status number counts only at a word boundary. Without this, ``TF401320``
+#: would read as "401" and every rule violation would look like a login problem.
+_STATUS_IN_TEXT = re.compile(r"(?<![\w.])(401|403|404|429)(?!\d)")
+
+
+def rule_validation_fields(payload: Any) -> List[str]:
+    """The fields Azure DevOps flagged on a rule violation, e.g. a missing mandatory field.
+
+    The API answers such a rejection with 400 and a ``RuleValidationErrors``
+    list inside ``customProperties``; naming those fields is the difference
+    between "request failed" and an actionable message.
+    """
+    body = _as_dict(payload)
+    rules = body.get("RuleValidationErrors")
+    if not isinstance(rules, list):
+        rules = _as_dict(body.get("customProperties")).get("RuleValidationErrors")
+
+    labels: List[str] = []
+    for rule in rules if isinstance(rules, list) else []:
+        entry = _as_dict(rule)
+        reference = entry.get("fieldReferenceName")
+        if not isinstance(reference, str) or not reference:
+            continue
+        # "TF401320: Rule Error for field Acceptance Criteria." -> the label a
+        # user sees in the form.
+        match = re.search(r"for field ([^.]+)\.", str(entry.get("errorMessage") or ""))
+        label = match.group(1).strip() if match else ""
+        text = f"{label} ({reference})" if label else reference
+        if text not in labels:
+            labels.append(text)
+    return labels
+
+
 def format_ado_error(error: Any) -> str:
     """Turn an Azure DevOps failure into one readable line."""
-    if isinstance(error, AzureDevOpsApiError):
-        message = str(error)
-    elif isinstance(error, Exception):
-        message = str(error)
-    else:
-        message = str(error)
+    message = str(error)
 
-    checks = (
-        ("TF401232", "Project not found. Verify the project name in your configuration."),
-        ("TF401233", "Work item not found. Check the work item ID."),
-        ("VS402335", "Invalid work item type. Use azure_devops_list_work_item_types to see valid types."),
-        ("TF401181", "The pull request cannot be edited in its current state (it may already be merging or completed)."),
-        ("401", "Authentication failed. Check your PAT or Azure CLI login."),
-        ("403", "Permission denied. Your credentials lack access to this resource."),
-        ("404", "Resource not found. Check the organization URL and project name."),
-        ("429", "Rate limited by Azure DevOps. Wait a moment and try again."),
-        ("ETIMEDOUT", "Network error: could not reach Azure DevOps. Check your connection."),
-        ("ECONNREFUSED", "Network error: could not reach Azure DevOps. Check your connection."),
-        ("ENOTFOUND", "DNS error: could not resolve the Azure DevOps hostname. Check the org URL."),
-    )
-    for needle, friendly in checks:
+    fields = rule_validation_fields(getattr(error, "body", None))
+    if fields:
+        return (
+            "Azure DevOps rejected the request: required field(s) missing or invalid: "
+            + ", ".join(fields)
+            + " (TF401320)."
+        )
+
+    for code, friendly in _CODE_HINTS:
+        if code in message:
+            return friendly
+
+    status = getattr(error, "status", None)
+    if isinstance(status, int) and status in _STATUS_HINTS:
+        return _STATUS_HINTS[status]
+
+    # Only trust the text when no HTTP status survived: a 400 whose body quotes
+    # "401" must not be read as an authentication failure.
+    if not isinstance(status, int) or status == 0:
+        found = _STATUS_IN_TEXT.search(message)
+        if found:
+            return _STATUS_HINTS[int(found.group(1))]
+
+    for needle, friendly in _NETWORK_HINTS:
         if needle in message:
             return friendly
 
@@ -214,15 +278,21 @@ def format_ado_error(error: Any) -> str:
 
 
 def is_auth_error(error: Any) -> bool:
+    status = getattr(error, "status", None)
+    if isinstance(status, int) and status in (401, 403):
+        return True
     message = str(error)
-    return "401" in message or "Unauthorized" in message or "Forbidden" in message or "403" in message
+    return "Unauthorized" in message or "Forbidden" in message
 
 
 def is_not_found_error(error: Any) -> bool:
     if isinstance(error, NotFoundError):
         return True
+    status = getattr(error, "status", None)
+    if isinstance(status, int) and status == 404:
+        return True
     message = str(error)
-    return "404" in message or "TF401233" in message or "Not Found" in message
+    return "TF401233" in message or "Not Found" in message
 
 
 def _describe_failure(status: int, payload: Any, url: str) -> AzureDevOpsApiError:
@@ -257,6 +327,16 @@ def _describe_failure(status: int, payload: Any, url: str) -> AzureDevOpsApiErro
     if status == 429:
         return AzureDevOpsApiError(
             status, "Azure DevOps rate limit reached (429). Wait a moment and retry.", url, payload
+        )
+
+    fields = rule_validation_fields(payload)
+    if fields:
+        return AzureDevOpsApiError(
+            status,
+            f"Azure DevOps rejected the request ({status}): required field(s) missing or "
+            f"invalid: {', '.join(fields)} (TF401320).",
+            url,
+            payload,
         )
 
     suffix = f": {detail}" if detail else ""
